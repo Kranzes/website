@@ -1,0 +1,34 @@
+# The URL the site will be built for
+base_url = "https://ilanjoselevich.com"
+
+# Whether to automatically compile all Sass files in the sass directory
+compile_sass = true
+
+# Whether to build a search index to be used later on by a JavaScript library
+build_search_index = true
+
+theme = "DeepThought"
+
+[markdown]
+# Whether to do syntax highlighting
+# Theme can be customised by setting the `highlight_theme` variable to a theme supported by Zola
+highlight_code = true
+highlight_theme = "nord"
+render_emoji = true
+
+
+[extra]
+
+navbar_items = [
+ { code = "en", nav_items = [
+  { url = "$BASE_URL", name = "Home" },
+  { url = "$BASE_URL/blog", name = "Blog" },
+ ]},
+]
+
+author.name = "Ilan Joselevich"
+author.avatar = "/images/avatar.jpg"
+
+social.github = "Kranzes"
+social.linkedin = "ilan-joselevich-b948561bb"
+social.email = "personal@ilanjoselevich.com"

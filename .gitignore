@@ -1,0 +1,7 @@
+# Nix
+result
+.direnv
+
+# Zola
+public
+themes
