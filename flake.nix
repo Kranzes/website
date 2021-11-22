@@ -23,7 +23,6 @@
           '';
           buildPhase = "zola build";
           installPhase = "cp -r public $out";
-          checkPhase = "zola check";
         };
         defaultPackage = self.packages.${system}.website;
         devShell = pkgs.mkShell {
