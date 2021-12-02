@@ -26,7 +26,7 @@
         };
         defaultPackage = self.packages.${system}.website;
         devShell = pkgs.mkShell {
-          packages = [ pkgs.zola ];
+          packages = with pkgs; [ zola nodePackages.gramma ];
           shellHook = ''
             mkdir -p themes
             ln -sn "${deepthought}" "themes/${themeName}"
