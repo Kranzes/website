@@ -3,46 +3,47 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
     deepthought = { url = "github:RatanShreshtha/DeepThought"; flake = false; };
     flake-compat-ci.url = "github:hercules-ci/flake-compat-ci";
     flake-compat = { url = "github:edolstra/flake-compat"; flake = false; };
   };
 
-  outputs = { self, nixpkgs, flake-utils, deepthought, flake-compat, flake-compat-ci }:
-    flake-utils.lib.eachDefaultSystem (system:
-      let
-        pkgs = nixpkgs.legacyPackages.${system};
-        themeName = ((builtins.fromTOML (builtins.readFile "${deepthought}/theme.toml")).name);
-      in
-      {
-        packages.website = pkgs.stdenv.mkDerivation rec {
-          pname = "static-website";
-          version = "2021-11-19";
-          src = ./.;
-          nativeBuildInputs = [ pkgs.zola ];
-          configurePhase = ''
-            mkdir -p "themes/${themeName}"
-            cp -r ${deepthought}/* "themes/${themeName}"
-          '';
-          buildPhase = "zola build";
-          installPhase = "cp -r public $out";
-        };
+  outputs = { self, nixpkgs, deepthought, flake-compat, flake-compat-ci }:
+    let
+      supportedSystems = [ "x86_64-linux" "aarch64-linux" ];
+      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
+      nixpkgsFor = forAllSystems (system: import nixpkgs { inherit system; });
+      themeName = ((builtins.fromTOML (builtins.readFile "${deepthought}/theme.toml")).name);
+    in
+    {
+      packages = forAllSystems (system: {
+        website = with nixpkgsFor.${system};
+          stdenv.mkDerivation rec {
+            pname = "static-website";
+            version = "2021-11-19";
+            src = ./.;
+            nativeBuildInputs = [ zola ];
+            configurePhase = ''
+              mkdir -p "themes/${themeName}"
+              cp -r ${deepthought}/* "themes/${themeName}"
+            '';
+            buildPhase = "zola build";
+            installPhase = "cp -r public $out";
+          };
+      });
 
-        defaultPackage = self.packages.${system}.website;
+      defaultPackage = forAllSystems (system: self.packages.${system}.website);
 
-        devShell = pkgs.mkShell {
-          packages = with pkgs; [ zola nodePackages.gramma ];
-          shellHook = ''
-            mkdir -p themes
-            ln -sn "${deepthought}" "themes/${themeName}"
-          '';
-        };
+      devShell = forAllSystems (system: with nixpkgsFor.${system}; mkShell {
+        packages = [ zola nodePackages.gramma ];
+        shellHook = ''
+          mkdir -p themes
+          ln -sn "${deepthought}" "themes/${themeName}"
+        '';
+      });
 
-        ciNix = flake-compat-ci.lib.recurseIntoFlakeWith {
-          flake = self;
-          systems = [ "x86_64-linux" "aarch64-linux" "i686-linux" ];
-        };
-      }
-    );
+      ciNix = flake-compat-ci.lib.recurseIntoFlakeWith {
+        flake = self;
+      };
+    };
 }
