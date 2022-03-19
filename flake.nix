@@ -8,15 +8,17 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
     deepthought = { url = "github:RatanShreshtha/DeepThought"; flake = false; };
     nix-filter.url = "github:numtide/nix-filter";
+    hercules-ci-effects = { url = "github:hercules-ci/hercules-ci-effects"; inputs.nixpkgs.follows = "nixpkgs"; };
   };
 
-  outputs = { self, nixpkgs, deepthought, nix-filter }:
+  outputs = { self, nixpkgs, deepthought, nix-filter, hercules-ci-effects }:
     let
       version = builtins.substring 0 8 self.lastModifiedDate;
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
       themeName = ((builtins.fromTOML (builtins.readFile "${deepthought}/theme.toml")).name);
+      hci-effects = hercules-ci-effects.lib.withPkgs nixpkgs.legacyPackages.x86_64-linux;
     in
     {
       packages = forAllSystems (system: {
@@ -54,5 +56,18 @@
           fi
         '';
       });
+
+      effects = { branch, ... }: {
+        netlify = hci-effects.runIf (branch == "master") (hci-effects.mkEffect {
+          inputs = [ nixpkgs.legacyPackages.x86_64-linux.netlify-cli ];
+          secretsMap.netlify = "default-netlify";
+          NETLIFY_SITE_ID = "9d17ad40-c2f8-4933-b7d8-bb0ac30f0907";
+          src = self.defaultPackage.x86_64-linux;
+          effectScript = ''
+            export NETLIFY_AUTH_TOKEN="$(readSecretString netlify .authToken)"
+            netlify deploy --dir=. --prod
+          '';
+        });
+      };
     };
 }
