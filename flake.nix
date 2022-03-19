@@ -13,40 +13,37 @@
 
   outputs = { self, nixpkgs, deepthought, nix-filter, hercules-ci-effects }:
     let
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
       version = builtins.substring 0 8 self.lastModifiedDate;
-      supportedSystems = [ "x86_64-linux" ];
-      forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
-      pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
+      hci-effects = hercules-ci-effects.lib.withPkgs pkgs;
       themeName = ((builtins.fromTOML (builtins.readFile "${deepthought}/theme.toml")).name);
-      hci-effects = hercules-ci-effects.lib.withPkgs nixpkgs.legacyPackages.x86_64-linux;
     in
     {
-      packages = forAllSystems (system: {
-        website = pkgs.${system}.stdenvNoCC.mkDerivation rec {
-          pname = "static-website";
-          inherit version;
-          src = nix-filter.lib {
-            root = self;
-            include = [
-              (nix-filter.lib.inDirectory "content")
-              (nix-filter.lib.inDirectory "static")
-              "config.toml"
-            ];
-          };
-          nativeBuildInputs = [ pkgs.${system}.zola ];
-          configurePhase = ''
-            mkdir -p "themes/${themeName}"
-            cp -r ${deepthought}/* "themes/${themeName}"
-          '';
-          buildPhase = "zola build";
-          installPhase = "cp -r public $out";
+      packages.${system}.website = pkgs.stdenvNoCC.mkDerivation {
+        pname = "static-website";
+        inherit version;
+        src = nix-filter.lib {
+          root = self;
+          include = [
+            (nix-filter.lib.inDirectory "content")
+            (nix-filter.lib.inDirectory "static")
+            "config.toml"
+          ];
         };
-      });
+        nativeBuildInputs = [ pkgs.zola ];
+        configurePhase = ''
+          mkdir -p "themes/${themeName}"
+          cp -r ${deepthought}/* "themes/${themeName}"
+        '';
+        buildPhase = "zola build";
+        installPhase = "cp -r public $out";
+      };
 
-      defaultPackage = forAllSystems (system: self.packages.${system}.website);
+      defaultPackage.${system} = self.packages.${system}.website;
 
-      devShell = forAllSystems (system: pkgs.${system}.mkShell {
-        packages = with pkgs.${system}; [ zola nodePackages.gramma ];
+      devShell.${system} = pkgs.mkShell {
+        packages = with pkgs; [ zola nodePackages.gramma ];
         shellHook = ''
           mkdir -p themes
           if [[ -d themes/${themeName} ]]; then
@@ -55,17 +52,15 @@
             ln -sn "${deepthought}" "themes/${themeName}"
           fi
         '';
-      });
+      };
 
       effects = { branch, ... }: {
         netlify = hci-effects.runIf (branch == "master") (hci-effects.mkEffect {
-          inputs = [ nixpkgs.legacyPackages.x86_64-linux.netlify-cli ];
           secretsMap.netlify = "default-netlify";
           NETLIFY_SITE_ID = "9d17ad40-c2f8-4933-b7d8-bb0ac30f0907";
-          src = self.defaultPackage.x86_64-linux;
           effectScript = ''
             export NETLIFY_AUTH_TOKEN="$(readSecretString netlify .authToken)"
-            netlify deploy --dir=. --prod
+            ${pkgs.netlify-cli}/bin/netlify deploy --dir=${self.defaultPackage.${system}} --prod
           '';
         });
       };
