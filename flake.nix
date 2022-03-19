@@ -12,8 +12,7 @@
 
   outputs = { self, nixpkgs, deepthought, nix-filter }:
     let
-      lastModifiedDate = self.lastModifiedDate or self.lastModified or "19700101";
-      version = builtins.substring 0 8 lastModifiedDate;
+      version = builtins.substring 0 8 self.lastModifiedDate;
       supportedSystems = [ "x86_64-linux" ];
       forAllSystems = nixpkgs.lib.genAttrs supportedSystems;
       pkgs = forAllSystems (system: nixpkgs.legacyPackages.${system});
@@ -48,9 +47,12 @@
         packages = with pkgs.${system}; [ zola nodePackages.gramma ];
         shellHook = ''
           mkdir -p themes
-          ln -sn "${deepthought}" "themes/${themeName}"
+          if [[ -d themes/${themeName} ]]; then
+            true
+          else
+            ln -sn "${deepthought}" "themes/${themeName}"
+          fi
         '';
       });
-
     };
 }
